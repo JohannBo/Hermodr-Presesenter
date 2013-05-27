@@ -148,6 +148,13 @@
           </property>
          </widget>
         </item>
+        <item row="0" column="2">
+         <widget class="QLabel" name="label_WSStatus">
+          <property name="text">
+           <string>Offline</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
       <widget class="QWidget" name="tab_2">
