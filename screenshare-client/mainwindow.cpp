@@ -6,7 +6,7 @@
 #include <QScreen>
 #include <QPixmap>
 #include <QBuffer>
-#include <QFile>
+#include <QCursor>
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -16,6 +16,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 //    DialogLogin l;
 //    int login = l.exec();
+    xratio = 1.0;
+    yratio = 1.0;
 
     wsSocket = new QWsSocket( this );
     socketStateChanged( wsSocket->state() );
@@ -25,7 +27,6 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect( wsSocket, SIGNAL(connected()), this, SLOT(socketConnected()) );
     QObject::connect( wsSocket, SIGNAL(disconnected()), this, SLOT(socketDisconnected()) );
     connectSocket();
-    imagenumber = 1;
 
 }
 
@@ -90,13 +91,17 @@ void MainWindow::connectSocket()
 
 void MainWindow::on_pushButton_newScreenshare_start_clicked()
 {
-    QTimer *screenshotTimer = new QTimer(this);
-    connect(screenshotTimer, SIGNAL(timeout()), this, SLOT(takeScreenshot()));
-    screenshotTimer->start(200);
+    screenshotTimer = new QTimer(this);
+    connect(screenshotTimer, SIGNAL(timeout()), this, SLOT(sendScreenshot()));
+    screenshotTimer->   start(500);
+
+    cursorTimer = new QTimer(this);
+    connect(cursorTimer, SIGNAL(timeout()), this, SLOT(sendCursorPosition()));
+    cursorTimer->start(200);
 
 }
 
-void MainWindow::takeScreenshot()
+void MainWindow::sendScreenshot()
 {
     QPixmap pixmap;
 
@@ -104,7 +109,13 @@ void MainWindow::takeScreenshot()
 
     pixmap = screen->grabWindow(0, 0, 0, 1920, 1080);
 
+    int xold = pixmap.width();
+    int yold = pixmap.height();
+
     pixmap = pixmap.scaledToHeight(720,Qt::SmoothTransformation);
+
+    xratio = pixmap.width() / (double)xold;
+    yratio = pixmap.height() / (double)yold;
 
     QByteArray byteArray;
     QBuffer buffer(&byteArray);
@@ -121,19 +132,22 @@ void MainWindow::takeScreenshot()
             part = base64String.right(frame);
             base64String.chop(frame);
 
-            sendval = "{\"last\" : \"0\", \"data\" : \"" + part + "\"}";
+            sendval = "{\"type\" : \"image\",\"last\" : \"0\", \"data\" : \"" + part + "\"}";
         } else {
             part = base64String.right(base64String.size());
             base64String.chop(base64String.size());
 
-            sendval = "{\"last\" : \"1\", \"data\" : \"" + part + "\"}";
+            sendval = "{\"type\" : \"image\",\"last\" : \"1\", \"data\" : \"" + part + "\"}";
         }
         wsSocket->write(sendval);
     }
-    QString filename = "myfile_" + QString::number(imagenumber) + ".jpg";
+}
 
-    imagenumber++;
-    QFile myFile(filename);
-    myFile.open(QIODevice::WriteOnly);
-    pixmap.save(&myFile, "JPG");
+void MainWindow::sendCursorPosition()
+{
+    double x = (double)QCursor::pos().x() * xratio;
+    double y = (double)QCursor::pos().y() * yratio;
+    QString sendval ="{\"type\" : \"cursor\",\"x\" : \"" + QString::number((int)x) + "\",\"y\" : \"" + QString::number((int)y) + "\"}";
+    wsSocket->write(sendval);
+
 }

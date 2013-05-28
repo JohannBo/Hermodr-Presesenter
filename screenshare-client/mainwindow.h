@@ -30,7 +30,8 @@ protected slots:
     
 private slots:
     void on_pushButton_newScreenshare_start_clicked();
-    void takeScreenshot();
+    void sendScreenshot();
+    void sendCursorPosition();
 
 protected:
     QWsSocket *wsSocket;
@@ -38,7 +39,9 @@ protected:
 private:
     Ui::MainWindow *ui;
     QTimer *screenshotTimer;
-    int imagenumber;
+    QTimer *cursorTimer;
+    double xratio;
+    double yratio;
 };
 
 #endif // MAINWINDOW_H
