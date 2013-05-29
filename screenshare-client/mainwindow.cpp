@@ -7,6 +7,9 @@
 #include <QPixmap>
 #include <QBuffer>
 #include <QCursor>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -18,6 +21,13 @@ MainWindow::MainWindow(QWidget *parent) :
 //    int login = l.exec();
     xratio = 1.0;
     yratio = 1.0;
+    for (int i = 0; i < partSize; ++i) {
+        for (int j = 0; j < partSize; ++j) {
+            images[i][j] = "";
+        }
+    }
+    oldCursorX = 0;
+    oldCursorY = 0;
 
     wsSocket = new QWsSocket( this );
     socketStateChanged( wsSocket->state() );
@@ -93,11 +103,12 @@ void MainWindow::on_pushButton_newScreenshare_start_clicked()
 {
     screenshotTimer = new QTimer(this);
     connect(screenshotTimer, SIGNAL(timeout()), this, SLOT(sendScreenshot()));
-    screenshotTimer->   start(500);
+    screenshotTimer->start(500);
 
     cursorTimer = new QTimer(this);
     connect(cursorTimer, SIGNAL(timeout()), this, SLOT(sendCursorPosition()));
     cursorTimer->start(200);
+
 
 }
 
@@ -112,42 +123,122 @@ void MainWindow::sendScreenshot()
     int xold = pixmap.width();
     int yold = pixmap.height();
 
-    pixmap = pixmap.scaledToHeight(720,Qt::SmoothTransformation);
+    pixmap = pixmap.scaledToHeight(720, Qt::SmoothTransformation);
 
     xratio = pixmap.width() / (double)xold;
     yratio = pixmap.height() / (double)yold;
 
-    QByteArray byteArray;
-    QBuffer buffer(&byteArray);
-    buffer.open(QIODevice::WriteOnly);
-    pixmap.save(&buffer, "JPG");
+    splitImage(pixmap);
 
-    QString base64String = byteArray.toBase64();
+//    QByteArray byteArray;
+//    QBuffer buffer(&byteArray);
+//    buffer.open(QIODevice::WriteOnly);
+//    pixmap.save(&buffer, "JPG");
+//    QString base64String = byteArray.toBase64();
 
-    QString part, sendval;
-    int frame = 1000;
+//    QString part, sendval;
+//    int frame = 1000;
 
-    while (base64String.size() > 0) {
-        if (base64String.size() > frame) {
-            part = base64String.right(frame);
-            base64String.chop(frame);
+//    while (base64String.size() > 0) {
+//        if (base64String.size() > frame) {
+//            part = base64String.right(frame);
+//            base64String.chop(frame);
 
-            sendval = "{\"type\" : \"image\",\"last\" : \"0\", \"data\" : \"" + part + "\"}";
-        } else {
-            part = base64String.right(base64String.size());
-            base64String.chop(base64String.size());
+//            sendval = "{\"type\" : \"image\",\"last\" : \"0\", \"data\" : \"" + part + "\"}";
+//        } else {
+//            part = base64String.right(base64String.size());
+//            base64String.chop(base64String.size());
 
-            sendval = "{\"type\" : \"image\",\"last\" : \"1\", \"data\" : \"" + part + "\"}";
-        }
-        wsSocket->write(sendval);
-    }
+//            sendval = "{\"type\" : \"image\",\"last\" : \"1\", \"data\" : \"" + part + "\"}";
+//        }
+//        wsSocket->write(sendval);
+//    }
 }
 
 void MainWindow::sendCursorPosition()
 {
-    double x = (double)QCursor::pos().x() * xratio;
-    double y = (double)QCursor::pos().y() * yratio;
-    QString sendval ="{\"type\" : \"cursor\",\"x\" : \"" + QString::number((int)x) + "\",\"y\" : \"" + QString::number((int)y) + "\"}";
-    wsSocket->write(sendval);
+    int x = (double)QCursor::pos().x() * xratio;
+    int y = (double)QCursor::pos().y() * yratio;
+    if (x != oldCursorX || y != oldCursorY) {
+        QString sendval ="{\"type\" : \"cursor\",\"x\" : \"" + QString::number(x) + "\",\"y\" : \"" + QString::number(y) + "\"}";
+        wsSocket->write(sendval);
+        oldCursorX = x;
+        oldCursorY = y;
+    }
+}
+
+void MainWindow::splitImage(QPixmap image){
+    int partX = image.width() / partSize;
+    int partY = image.height() / partSize;
+    int posX = 0;
+    int posY = 0;
+
+
+    for (int x = 0; x < partSize; ++x) {
+        for (int y = 0; y < partSize; ++y) {
+            QPixmap imagePart = image.copy(posX, posY, partX, partY);
+            posX += partX;
+
+            QString oldPart = images[x][y];
+
+            QByteArray byteArray;
+            QBuffer buffer(&byteArray);
+            buffer.open(QIODevice::WriteOnly);
+            imagePart.save(&buffer, "JPG");
+            QString newPart = byteArray.toBase64();
+
+            if (newPart != oldPart) {
+                images[x][y] = newPart;
+                sendImage(newPart, x, y);
+
+//                qDebug() << "X: " << posX << " Y: " << posY << " width: " << imagePart.width() << " heigth: " << imagePart.height() << " length: " << newPart.length();
+            }
+        }
+        posY += partY;
+        posX = 0;
+    }
+
 
 }
+
+void MainWindow::sendImage(QString imagePart, int posX, int posY) {
+
+    while (imagePart.length() > 0) {
+        QString type = "image";
+        QString last = "0";
+        QString partToSend = "";
+        QString x = QString::number(posX);
+        QString y = QString::number(posY);
+
+        if (imagePart.length() > frameLength) {
+            partToSend = imagePart.right(frameLength);
+            imagePart.chop(frameLength);
+        } else {
+            partToSend = imagePart;
+            imagePart = "";
+            last = "1";
+        }
+
+        QString sendVal = "{"
+                "\"type\":\"" + type + "\","
+                "\"last\":\"" + last + "\","
+                "\"x\":\"" + x + "\","
+                "\"y\":\"" + y + "\","
+                "\"data\":\"" + partToSend + "\""
+                "}";
+        wsSocket->write(sendVal);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
