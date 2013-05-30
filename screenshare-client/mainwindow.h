@@ -9,6 +9,8 @@
 #include "QWsSocket.h"
 #include "dialoglogin.h"
 
+#define GRID_SIZE 20
+
 
 namespace Ui {
 class MainWindow;
@@ -40,14 +42,13 @@ protected:
     QWsSocket *wsSocket;
 
 private:
+    static const int FRAME_LENGTH;
     Ui::MainWindow *ui;
     QTimer *screenshotTimer;
     QTimer *cursorTimer;
     double xratio;
     double yratio;
-    const int frameLength = 1000;
-    const int partSize = 20;
-    QString images[20][20];
+    QString images[GRID_SIZE][GRID_SIZE];
     int oldCursorX;
     int oldCursorY;
 };

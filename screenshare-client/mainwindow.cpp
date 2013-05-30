@@ -11,6 +11,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 
+const int MainWindow::FRAME_LENGTH = 1000;
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -21,8 +22,9 @@ MainWindow::MainWindow(QWidget *parent) :
 //    int login = l.exec();
     xratio = 1.0;
     yratio = 1.0;
-    for (int i = 0; i < partSize; ++i) {
-        for (int j = 0; j < partSize; ++j) {
+
+    for (int i = 0; i < GRID_SIZE; ++i) {
+        for (int j = 0; j < GRID_SIZE; ++j) {
             images[i][j] = "";
         }
     }
@@ -45,6 +47,7 @@ MainWindow::~MainWindow()
     delete wsSocket;
     delete screenshotTimer;
     delete ui;
+
 }
 
 void MainWindow::socketStateChanged(QAbstractSocket::SocketState socketState)
@@ -129,30 +132,6 @@ void MainWindow::sendScreenshot()
     yratio = pixmap.height() / (double)yold;
 
     splitImage(pixmap);
-
-//    QByteArray byteArray;
-//    QBuffer buffer(&byteArray);
-//    buffer.open(QIODevice::WriteOnly);
-//    pixmap.save(&buffer, "JPG");
-//    QString base64String = byteArray.toBase64();
-
-//    QString part, sendval;
-//    int frame = 1000;
-
-//    while (base64String.size() > 0) {
-//        if (base64String.size() > frame) {
-//            part = base64String.right(frame);
-//            base64String.chop(frame);
-
-//            sendval = "{\"type\" : \"image\",\"last\" : \"0\", \"data\" : \"" + part + "\"}";
-//        } else {
-//            part = base64String.right(base64String.size());
-//            base64String.chop(base64String.size());
-
-//            sendval = "{\"type\" : \"image\",\"last\" : \"1\", \"data\" : \"" + part + "\"}";
-//        }
-//        wsSocket->write(sendval);
-//    }
 }
 
 void MainWindow::sendCursorPosition()
@@ -168,14 +147,14 @@ void MainWindow::sendCursorPosition()
 }
 
 void MainWindow::splitImage(QPixmap image){
-    int partX = image.width() / partSize;
-    int partY = image.height() / partSize;
+    int partX = image.width() / GRID_SIZE;
+    int partY = image.height() / GRID_SIZE;
     int posX = 0;
     int posY = 0;
 
 
-    for (int x = 0; x < partSize; ++x) {
-        for (int y = 0; y < partSize; ++y) {
+    for (int x = 0; x < GRID_SIZE; ++x) {
+        for (int y = 0; y < GRID_SIZE; ++y) {
             QPixmap imagePart = image.copy(posX, posY, partX, partY);
             posX += partX;
 
@@ -210,9 +189,9 @@ void MainWindow::sendImage(QString imagePart, int posX, int posY) {
         QString x = QString::number(posX);
         QString y = QString::number(posY);
 
-        if (imagePart.length() > frameLength) {
-            partToSend = imagePart.right(frameLength);
-            imagePart.chop(frameLength);
+        if (imagePart.length() > FRAME_LENGTH) {
+            partToSend = imagePart.right(FRAME_LENGTH);
+            imagePart.chop(FRAME_LENGTH);
         } else {
             partToSend = imagePart;
             imagePart = "";
