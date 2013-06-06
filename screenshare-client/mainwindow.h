@@ -6,7 +6,7 @@
 #include <QTimer>
 #include <QPixmap>
 #include <QUrl>
-#include <QAudioRecorder>
+#include <QProcess>
 
 #include "QWsSocket.h"
 #include "dialoglogin.h"
@@ -43,9 +43,9 @@ private slots:
     void sendImage(QString imagePart, int posX, int posY);
 
     void startRecorderOnline();
-    void stopRecorderOnline();
+
     void startRecorderOffline();
-    QString openSoundFile(QUrl url);
+
     void sendAudio(QString audio);
 
     void on_pushButton_newScreenshare_stop_clicked();
@@ -56,6 +56,10 @@ private slots:
 
     void on_pushButton_newScreenshare_pause_clicked();
 
+    void on_actionQuit_triggered();
+
+    void on_actionAbout_triggered();
+
 protected:
 
 
@@ -64,16 +68,14 @@ private:
     Ui::MainWindow *ui;
     QWsSocket *wsSocket;
     bool isWsSocket;
-    QAudioRecorder *audioRecorderOnline;
-    bool isAudioRecorderOnline;
-    QAudioRecorder *audioRecorderOffline;
-    bool isAudioRecorderOffline;
     QTimer *screenshotTimer;
     bool isScreenshotTimer;
     QTimer *cursorTimer;
     bool isCursorTimer;
     QTimer *audioTimer;
     bool isAudioTimer;
+    QProcess *ffmpeg;
+    bool isffmpeg;
     double xratio;
     double yratio;
     QString images[GRID_SIZE][GRID_SIZE];
@@ -81,6 +83,7 @@ private:
     int oldCursorY;
     int pictureFileIndex;
     int soundFileIndex;
+    int secondInAudioFile;
 };
 
 #endif // MAINWINDOW_H

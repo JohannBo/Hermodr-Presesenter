@@ -6,11 +6,10 @@
 #include <QBuffer>
 #include <QCursor>
 #include <QFile>
+#include <QDir>
 #include <QPainter>
 #include <QMessageBox>
-#include <QProcess>
-
-
+#include <QFileDialog>
 
 const int MainWindow::FRAME_LENGTH = 1000;
 
@@ -20,39 +19,16 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    screenshotTimer = new QTimer(this);
-    isScreenshotTimer = true;
-    cursorTimer = new QTimer(this);
-    isCursorTimer = true;
-    audioTimer = new QTimer(this);
-    isAudioTimer = true;
-
-    //    DialogLogin l;
-    //    int login = l.exec();
+    isWsSocket = false;
+    isScreenshotTimer = false;
+    isCursorTimer = false;
+    isAudioTimer = false;
+    isffmpeg = false;
 
 }
 
 MainWindow::~MainWindow()
 {
-    if (isAudioRecorderOffline) {
-        delete audioRecorderOffline;
-    }
-    if (isAudioRecorderOnline) {
-        delete audioRecorderOnline;
-    }
-    if (isAudioTimer) {
-        delete audioTimer;
-    }
-    if (isCursorTimer) {
-        delete cursorTimer;
-    }
-    if (isScreenshotTimer) {
-        delete screenshotTimer;
-    }
-    if (isWsSocket) {
-        delete wsSocket;
-    }
-
     delete ui;
 }
 
@@ -96,7 +72,6 @@ void MainWindow::socketConnected()
 {
     qDebug() << "socket connected.";
     startScreenshare();
-
 }
 
 void MainWindow::socketDisconnected()
@@ -114,21 +89,29 @@ void MainWindow::connectSocket()
 void MainWindow::startScreenshare()
 {
     // todo schöner
-    if (ui->checkBox_newScreenshare_live->isChecked()) {
-        if (ui->checkBox_newScreenshare_live_audio->isChecked()) {
-            connect(audioTimer, SIGNAL(timeout()), this, SLOT(stopRecorderOnline()));
-            startRecorderOnline();
-        }
+
+    if (ui->checkBox_newScreenshare_live->isChecked() && ui->checkBox_newScreenshare_live_audio->isChecked()) {
+
+        startRecorderOffline();
+
+        audioTimer = new QTimer(this);
+        isAudioTimer = true;
+        connect(audioTimer,SIGNAL(timeout()), this, SLOT(startRecorderOnline()));
+        audioTimer->start(1000);
+
+    } else if (ui->checkBox_newScreenshare_file->isChecked() && ui->checkBox_newScreenshare_file_audio->isChecked()) {
+        startRecorderOffline();
     }
 
-    if (ui->checkBox_newScreenshare_file->isChecked()) {
-        if (ui->checkBox_newScreenshare_file_audio->isChecked()) {
-            startRecorderOffline();
-        }
-    }
+
+
+    screenshotTimer = new QTimer(this);
+    isScreenshotTimer = true;
     connect(screenshotTimer, SIGNAL(timeout()), this, SLOT(takeScreenshot()));
     screenshotTimer->start(500);
 
+    cursorTimer = new QTimer(this);
+    isCursorTimer = true;
     connect(cursorTimer, SIGNAL(timeout()), this, SLOT(sendCursorPosition()));
     cursorTimer->start(200);
 
@@ -143,7 +126,6 @@ void MainWindow::takeScreenshot()
 
     QScreen *screen = QGuiApplication::primaryScreen();
 
-    // todo werte aus settings
     int posX = ui->lineEdit_settings_positionX->text().toInt();
     int posY = ui->lineEdit_settings_positionY->text().toInt();
     int screenshotHeight = ui->lineEdit_settings_height->text().toInt();
@@ -175,12 +157,12 @@ void MainWindow::saveScreenshot(QPixmap screenshot)
     // draw mouse into screenshot
     QPainter qp(&screenshot);
     qp.fillRect(oldCursorX, oldCursorY, 5, 5, Qt::black);
-    qp.fillRect(oldCursorX+1, oldCursorY+1, 3, 3, Qt::white);
+    qp.fillRect(oldCursorX + 1, oldCursorY + 1, 3, 3, Qt::white);
     qp.end();
 
     // save screenshot to file
-    QString filename = "pic" + QString::number(pictureFileIndex++) + ".jpg";
-    QFile myFile(filename);
+    QString filename = "frame" + QString::number(pictureFileIndex++) + ".jpg";
+    QFile myFile(ui->lineEdit_newScreenshare_title->text() + "/" + filename);
     myFile.open(QIODevice::WriteOnly);
     screenshot.save(&myFile, "JPG");
 }
@@ -270,58 +252,64 @@ void MainWindow::sendImage(QString imagePart, int posX, int posY) {
 
 void MainWindow::startRecorderOffline()
 {
-    QAudioEncoderSettings audioSettings;
-    audioSettings.setCodec("audio/vorbis");
-    audioSettings.setQuality(QMultimedia::NormalQuality);
+    QString program = ui->lineEdit_settings_ffmpeg->text();
+    QString filename = ui->lineEdit_newScreenshare_title->text() + "/sound.wav";
 
-    audioRecorderOffline= new QAudioRecorder;
-    isAudioRecorderOffline = true;
-    audioRecorderOffline->setEncodingSettings(audioSettings);
+    QFile file(filename);
+    if(file.exists()) {
+        file.remove();
+    }
 
-    audioRecorderOffline->setOutputLocation(QUrl::fromLocalFile("sound.ogg"));
+    QStringList arguments;
+    //ffmpeg -f alsa -ac 1 -i pulse -b:a 32k -codec:a libvorbis sound.ogg
+//    arguments << "-f" << "alsa" << "-ac" << "1" << "-i" << "pulse" << "-b:a" << "32k" << "-codec:a" << "libvorbis" << filename;
+    arguments << "-f" << "alsa" << "-ac" << "1" << "-i" << "pulse" << "-codec:a" << "pcm_s16le" << filename;
 
-    audioRecorderOffline->record();
+    ffmpeg = new QProcess(this);
+    isffmpeg = true;
+    ffmpeg->start(program, arguments);
 }
 
 void MainWindow::startRecorderOnline()
 {
-    QAudioEncoderSettings audioSettings;
-    audioSettings.setCodec("audio/vorbis");
-    audioSettings.setQuality(QMultimedia::VeryLowQuality);
+    if (secondInAudioFile < 0) {
+        secondInAudioFile++;
+        return;
+    }
 
-    audioRecorderOnline = new QAudioRecorder;
-    isAudioRecorderOnline = true;
-    audioRecorderOnline->setEncodingSettings(audioSettings);
+    int thisSecond = secondInAudioFile++;
+    QString filenameOut = ui->lineEdit_newScreenshare_title->text() + "/test" + QString::number(thisSecond) +".ogg";
+    QString filenameIn = ui->lineEdit_newScreenshare_title->text() + "/sound.wav";
 
-    audioRecorderOnline->setOutputLocation(QUrl::fromLocalFile("sound" + QString::number(soundFileIndex++) + ".ogg"));
+    QString program = ui->lineEdit_settings_ffmpeg->text();
+    QStringList arguments;
 
-//    audioTimer->singleShot(1000, this, SLOT(stopRecorderOnline()));
-    audioTimer->start(1000);
-    audioRecorderOnline->record();
+    arguments << "-i" << filenameIn << "-ss" << QString::number(thisSecond) << "-t" << "1" << "-b:a" << "32k" << "-codec:a" << "libvorbis" << filenameOut;
+    //ffmpeg -i test.ogg -ss 1 -t 1 -b:a 32k -codec:a libvorbis footest.ogg
 
-}
+    QProcess ffmpegChunk(this);
+    ffmpegChunk.start(program, arguments);
 
-void MainWindow::stopRecorderOnline()
-{
-    audioTimer->stop();
-    audioRecorderOnline->stop();
-    QUrl soundUrl = audioRecorderOnline->outputLocation();
-    delete audioRecorderOnline;
-    isAudioRecorderOnline = false;
-    QString sound = openSoundFile(soundUrl);
-    sendAudio(sound);
-    startRecorderOnline();
-
-}
-
-QString MainWindow::openSoundFile(QUrl url)
-{
-    QFile myFile(url.url());
+    if (!ffmpegChunk.waitForFinished()){
+        qDebug() << "error waiting for process";
+    }
+    QFile myFile(filenameOut);
     myFile.open(QIODevice::ReadOnly);
     QByteArray array = myFile.readAll();
     myFile.close();
     myFile.remove();
-    return array.toBase64();
+    sendAudio( array.toBase64());
+
+
+    // eine sekunde aufnehmen
+    // ffmpeg -f alsa -ac 1 -i pulse -t 1 -b:a 32k -codec:a libvorbis test.ogg
+
+    // aufnahme starten
+    // ffmpeg -f alsa -ac 1 -i pulse -b:a 32k -codec:a libvorbis test.ogg
+
+    // chunk aus test.ogg an stelle ss für t sekunden nach footest speichern
+    // ffmpeg -i test.ogg -ss 1 -t 1 -b:a 32k -codec:a libvorbis footest.ogg
+
 }
 
 void MainWindow::sendAudio(QString audio)
@@ -362,6 +350,8 @@ void MainWindow::on_pushButton_newScreenshare_start_clicked()
     ui->pushButton_newScreenshare_stop->setEnabled(true);
     ui->pushButton_newScreenshare_pause->setEnabled(true);
     ui->tab_settings->setEnabled(false);
+    ui->lineEdit_newScreenshare_title->setEnabled(false);
+    ui->plainTextEdit_newScreenshare_description->setEnabled(false);
 
     xratio = 1.0;
     yratio = 1.0;
@@ -369,6 +359,7 @@ void MainWindow::on_pushButton_newScreenshare_start_clicked()
     oldCursorY = 0;
     pictureFileIndex = 0;
     soundFileIndex = 0;
+    secondInAudioFile = -2;
 
     for (int x = 0; x < GRID_SIZE; ++x) {
         for (int y = 0; y < GRID_SIZE; ++y) {
@@ -376,7 +367,9 @@ void MainWindow::on_pushButton_newScreenshare_start_clicked()
         }
     }
 
-    // Todo directory anlegen
+    QDir *qDir = new QDir();
+    qDir->mkdir(ui->lineEdit_newScreenshare_title->text());
+    delete qDir;
 
     if (ui->checkBox_newScreenshare_live->isChecked()) {
         wsSocket = new QWsSocket( this );
@@ -397,43 +390,87 @@ void MainWindow::on_pushButton_newScreenshare_start_clicked()
 
 void MainWindow::on_pushButton_newScreenshare_stop_clicked()
 {
-    QString program = ui->lineEdit_settings_ffmpeg->text();
-    QStringList arguments;
-    arguments << "-i" << "sound0.ogg" << "blubb.mp3";
-    QProcess *myProcess = new QProcess(this);
-    myProcess->start(program, arguments);
-
-    // todo ffmpeg
-
     if (isCursorTimer) {
         cursorTimer->stop();
+        delete cursorTimer;
+        isCursorTimer = false;
     }
 
     if (isScreenshotTimer) {
         screenshotTimer->stop();
+        delete screenshotTimer;
+        isScreenshotTimer = false;
     }
 
     if (isAudioTimer) {
         audioTimer->stop();
+        delete audioTimer;
+        isAudioTimer = false;
     }
 
-    if (isAudioRecorderOffline) {
-        audioRecorderOffline->stop();
-    }
-
-    if (isAudioRecorderOnline) {
-        audioRecorderOnline->stop();
+    if (isffmpeg) {
+        ffmpeg->kill();
+        // todo save file
+        delete ffmpeg;
+        isffmpeg = false;
     }
 
     if (isWsSocket) {
         wsSocket->abort("disconnect");
+        delete wsSocket;
+        isWsSocket = false;
     }
 
+    if (ui->checkBox_newScreenshare_file->isChecked()) {
+        //        QString filenameOut = ui->lineEdit_newScreenshare_title->text() + ".webm";
+        QString filenameOut = QFileDialog::getSaveFileName(this, tr("Save File"), QString(), tr("Webm Videos (*.webm)"));
+
+
+        if (!filenameOut.isEmpty()) {
+            if (!filenameOut.endsWith(".webm")) {
+                filenameOut.append(".webm");
+            }
+            QFile file(filenameOut);
+            if (file.exists()) {
+                file.remove();
+            }
+
+            QString program = ui->lineEdit_settings_ffmpeg->text();
+            QStringList arguments;
+
+            if (ui->checkBox_newScreenshare_file_audio->isChecked()) {
+                QString filenameSoundIn = ui->lineEdit_newScreenshare_title->text() + "/sound.wav";
+                // ffmpeg -i sound0.ogg -f image2 -framerate 2 -i frame%d.jpg c.webm
+                arguments << "-i" << filenameSoundIn << "-f" << "image2" << "-framerate" << "2" << "-i" << ui->lineEdit_newScreenshare_title->text() + "/frame%d.jpg" << filenameOut;
+            } else {
+                // ffmpeg -f image2 -framerate 2 -i frame%d.jpg c.webm
+                arguments << "-f" << "image2" << "-framerate" << "2" << "-i" << ui->lineEdit_newScreenshare_title->text() + "/frame%d.jpg" << filenameOut;
+            }
+
+            QProcess ffmpegVideoCreator(this);
+            ffmpegVideoCreator.start(program, arguments);
+
+            if (!ffmpegVideoCreator.waitForFinished()){
+                qDebug() << "error waiting for process";
+            }
+
+            QDir dir(ui->lineEdit_newScreenshare_title->text());
+            dir.removeRecursively();
+
+        } else {
+            qDebug() << "saving file canceled";
+        }
+    } else {
+        QDir dir(ui->lineEdit_newScreenshare_title->text());
+        dir.removeRecursively();
+    }
 
     ui->pushButton_newScreenshare_start->setEnabled(true);
     ui->pushButton_newScreenshare_stop->setEnabled(false);
     ui->pushButton_newScreenshare_pause->setEnabled(false);
     ui->tab_settings->setEnabled(true);
+    ui->lineEdit_newScreenshare_title->setEnabled(true);
+    ui->plainTextEdit_newScreenshare_description->setEnabled(true);
 }
 
 void MainWindow::on_checkBox_newScreenshare_live_clicked()
@@ -457,4 +494,15 @@ void MainWindow::on_checkBox_newScreenshare_file_clicked()
 void MainWindow::on_pushButton_newScreenshare_pause_clicked()
 {
     qDebug() << "todo";
+}
+
+void MainWindow::on_actionQuit_triggered()
+{
+    qApp->quit();
+}
+
+void MainWindow::on_actionAbout_triggered()
+{
+    QMessageBox mbox(this);
+
 }
