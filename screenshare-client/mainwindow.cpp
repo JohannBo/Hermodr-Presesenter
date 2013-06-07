@@ -504,5 +504,7 @@ void MainWindow::on_actionQuit_triggered()
 void MainWindow::on_actionAbout_triggered()
 {
     QMessageBox mbox(this);
+    mbox.setText("Digital Whiteboard. By Johann Bornholdt\njohann.bornholdt@gmail.com");
+    mbox.exec();
 
 }
