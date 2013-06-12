@@ -1,2 +1,11 @@
  
 This is the Presenter Program of Hermodr-Screenshare.
+
+-----------------------------------------------------
+
+To compile this program you need Qt5.
+
+FFmpeg is required to run this program.
+
+Right now, all functionality that uses FFmpeg only works on Linux.
+This will be fixed soon.
