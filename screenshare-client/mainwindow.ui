@@ -195,69 +195,83 @@
          </widget>
         </item>
         <item row="3" column="0">
+         <widget class="QLabel" name="label_9">
+          <property name="text">
+           <string>dshow audio device</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="QLineEdit" name="lineEdit_settings_dshow">
+          <property name="text">
+           <string>Intel(r) Integrated Audio</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
          <widget class="QLabel" name="label_4">
           <property name="text">
            <string>Capture Position X</string>
           </property>
          </widget>
         </item>
-        <item row="3" column="1">
+        <item row="4" column="1">
          <widget class="QLineEdit" name="lineEdit_settings_positionX">
           <property name="text">
            <string>0</string>
           </property>
          </widget>
         </item>
-        <item row="4" column="0">
+        <item row="5" column="0">
          <widget class="QLabel" name="label_5">
           <property name="text">
            <string>Capture Position Y</string>
           </property>
          </widget>
         </item>
-        <item row="4" column="1">
+        <item row="5" column="1">
          <widget class="QLineEdit" name="lineEdit_settings_positionY">
           <property name="text">
            <string>0</string>
           </property>
          </widget>
         </item>
-        <item row="5" column="0">
+        <item row="6" column="0">
          <widget class="QLabel" name="label_6">
           <property name="text">
            <string>Capture width</string>
           </property>
          </widget>
         </item>
-        <item row="5" column="1">
+        <item row="6" column="1">
          <widget class="QLineEdit" name="lineEdit_settings_width">
           <property name="text">
            <string>1920</string>
           </property>
          </widget>
         </item>
-        <item row="6" column="0">
+        <item row="7" column="0">
          <widget class="QLabel" name="label_7">
           <property name="text">
            <string>Capture height</string>
           </property>
          </widget>
         </item>
-        <item row="6" column="1">
+        <item row="7" column="1">
          <widget class="QLineEdit" name="lineEdit_settings_height">
           <property name="text">
            <string>1080</string>
           </property>
          </widget>
         </item>
-        <item row="7" column="0">
+        <item row="8" column="0">
          <widget class="QLabel" name="label_8">
           <property name="text">
            <string>Target height</string>
           </property>
          </widget>
         </item>
-        <item row="7" column="1">
+        <item row="8" column="1">
          <widget class="QLineEdit" name="lineEdit_settings_targetHeight">
           <property name="text">
            <string>720</string>

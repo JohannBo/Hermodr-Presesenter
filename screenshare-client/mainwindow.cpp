@@ -44,6 +44,11 @@ MainWindow::MainWindow(QWidget *parent) :
     isCursorTimer = false;
     isAudioTimer = false;
     isffmpeg = false;
+#ifdef Q_OS_WIN
+    ui->lineEdit_settings_dshow->setText("Mikrofon (Realtek High Definiti");
+    ui->lineEdit_settings_ffmpeg->setText("C:\\ffmpeg\\bin\\ffmpeg");
+#endif
+
 
 }
 
@@ -283,7 +288,12 @@ void MainWindow::startRecorderOffline()
     QStringList arguments;
     //ffmpeg -f alsa -ac 1 -i pulse -b:a 32k -codec:a libvorbis sound.ogg
 //    arguments << "-f" << "alsa" << "-ac" << "1" << "-i" << "pulse" << "-b:a" << "32k" << "-codec:a" << "libvorbis" << filename;
+
+#ifdef Q_OS_WIN
+    arguments << "-f" << "dshow" << "-i" << ("audio=" + ui->lineEdit_settings_dshow->text() + "") << "-codec:a" << "pcm_s16le" << filename;
+#else
     arguments << "-f" << "alsa" << "-ac" << "1" << "-i" << "pulse" << "-codec:a" << "pcm_s16le" << filename;
+#endif
 
     ffmpeg = new QProcess(this);
     isffmpeg = true;
@@ -304,7 +314,7 @@ void MainWindow::startRecorderOnline()
     QString program = ui->lineEdit_settings_ffmpeg->text();
     QStringList arguments;
 
-    arguments << "-i" << filenameIn << "-ss" << QString::number(thisSecond) << "-t" << "1" << "-b:a" << "32k" << "-codec:a" << "libvorbis" << filenameOut;
+    arguments << "-i" << filenameIn << "-ss" << QString::number(thisSecond) << "-t" << "1" << "-b:a" << "64k" << "-codec:a" << "libvorbis" << filenameOut;
     //ffmpeg -i test.ogg -ss 1 -t 1 -b:a 32k -codec:a libvorbis footest.ogg
 
     QProcess ffmpegChunk(this);
